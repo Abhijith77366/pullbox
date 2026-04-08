@@ -12,37 +12,43 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-# 🌐 PRO WEB UI
+# 🌐 PRO UI
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
     <html>
     <head>
         <title>PullBox</title>
+
         <style>
             body {
                 font-family: Arial;
                 text-align: center;
-                background: linear-gradient(135deg, #0f172a, #1e293b);
+                background: linear-gradient(-45deg, #0f172a, #1e293b, #0ea5e9, #020617);
+                background-size: 400% 400%;
+                animation: gradientBG 10s ease infinite;
                 color: white;
-                padding-top: 40px;
-                animation: fadeIn 1s ease-in;
+            }
+
+            @keyframes gradientBG {
+                0% {background-position: 0% 50%;}
+                50% {background-position: 100% 50%;}
+                100% {background-position: 0% 50%;}
             }
 
             h1 {
+                margin-top: 30px;
                 color: #38bdf8;
-                animation: slideDown 1s ease;
             }
 
             .box {
-                background: rgba(255,255,255,0.05);
-                backdrop-filter: blur(10px);
+                background: rgba(255,255,255,0.08);
+                backdrop-filter: blur(12px);
                 padding: 20px;
                 margin: 20px auto;
-                width: 340px;
+                width: 350px;
                 border-radius: 15px;
-                box-shadow: 0 0 20px rgba(0,0,0,0.3);
-                animation: fadeInUp 1s ease;
+                box-shadow: 0 0 20px rgba(0,0,0,0.4);
             }
 
             input, button {
@@ -51,46 +57,57 @@ def home():
                 width: 80%;
                 border-radius: 8px;
                 border: none;
-                outline: none;
-            }
-
-            input {
-                background: #0f172a;
-                color: white;
             }
 
             button {
                 background: #38bdf8;
-                color: black;
                 cursor: pointer;
                 transition: 0.3s;
             }
 
             button:hover {
-                background: #0ea5e9;
                 transform: scale(1.05);
+                background: #0ea5e9;
+            }
+
+            #drop-zone {
+                border: 2px dashed #38bdf8;
+                padding: 20px;
+                margin: 10px;
+                border-radius: 10px;
             }
 
             #preview {
-                margin-top: 10px;
                 max-width: 100%;
+                display: none;
                 border-radius: 10px;
+            }
+
+            #progress {
+                width: 80%;
+                height: 10px;
+                background: #1e293b;
+                margin: auto;
+                border-radius: 5px;
+                overflow: hidden;
                 display: none;
             }
 
-            @keyframes fadeIn {
-                from {opacity: 0;}
-                to {opacity: 1;}
+            #progress-bar {
+                height: 100%;
+                width: 0%;
+                background: #38bdf8;
             }
 
-            @keyframes slideDown {
-                from {transform: translateY(-20px); opacity: 0;}
-                to {transform: translateY(0); opacity: 1;}
-            }
-
-            @keyframes fadeInUp {
-                from {transform: translateY(20px); opacity: 0;}
-                to {transform: translateY(0); opacity: 1;}
+            .toast {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #38bdf8;
+                color: black;
+                padding: 10px;
+                border-radius: 8px;
+                display: none;
             }
         </style>
     </head>
@@ -98,41 +115,64 @@ def home():
     <body>
 
         <h1>🚀 PullBox</h1>
-        <p>Modern File Sharing System</p>
+        <p>Pro File Sharing System</p>
 
         <!-- Upload -->
         <div class="box">
-            <h3>Upload File</h3>
+            <h3>Upload</h3>
 
-            <form action="/upload" enctype="multipart/form-data" method="post">
-                <input type="file" name="file" id="fileInput" required><br>
+            <div id="drop-zone">Drag & Drop File Here</div>
+            <input type="file" id="fileInput"><br>
 
-                <!-- 📁 File Preview -->
-                <img id="preview"/>
+            <img id="preview">
 
-                <input type="number" name="expiry" value="30"><br>
-                <button type="submit">Upload</button>
-            </form>
+            <div id="progress"><div id="progress-bar"></div></div>
+
+            <button onclick="uploadFile()">Upload</button>
         </div>
 
         <!-- Download -->
         <div class="box">
-            <h3>Download File</h3>
+            <h3>Download</h3>
             <input type="text" id="code" placeholder="Enter Code"><br>
             <button onclick="downloadFile()">Download</button>
         </div>
 
+        <!-- Toast -->
+        <div id="toast" class="toast"></div>
+
         <script>
-            // 📁 FILE PREVIEW
+            let selectedFile;
+
             const fileInput = document.getElementById("fileInput");
             const preview = document.getElementById("preview");
+            const dropZone = document.getElementById("drop-zone");
 
-            fileInput.addEventListener("change", function() {
-                const file = this.files[0];
+            // Drag Drop
+            dropZone.addEventListener("dragover", e => {
+                e.preventDefault();
+                dropZone.style.background = "#1e293b";
+            });
 
-                if (file && file.type.startsWith("image")) {
+            dropZone.addEventListener("dragleave", () => {
+                dropZone.style.background = "transparent";
+            });
+
+            dropZone.addEventListener("drop", e => {
+                e.preventDefault();
+                selectedFile = e.dataTransfer.files[0];
+                handlePreview(selectedFile);
+            });
+
+            fileInput.addEventListener("change", () => {
+                selectedFile = fileInput.files[0];
+                handlePreview(selectedFile);
+            });
+
+            function handlePreview(file){
+                if(file && file.type.startsWith("image")){
                     const reader = new FileReader();
-                    reader.onload = function(e) {
+                    reader.onload = e => {
                         preview.src = e.target.result;
                         preview.style.display = "block";
                     }
@@ -140,16 +180,51 @@ def home():
                 } else {
                     preview.style.display = "none";
                 }
-            });
+            }
 
-            // ⬇ DOWNLOAD
-            function downloadFile() {
-                var code = document.getElementById("code").value;
+            // Upload with progress
+            function uploadFile(){
+                if(!selectedFile){
+                    showToast("Select file first");
+                    return;
+                }
+
+                let formData = new FormData();
+                formData.append("file", selectedFile);
+                formData.append("expiry", 30);
+
+                let xhr = new XMLHttpRequest();
+                xhr.open("POST", "/upload");
+
+                xhr.upload.onprogress = e => {
+                    document.getElementById("progress").style.display = "block";
+                    let percent = (e.loaded / e.total) * 100;
+                    document.getElementById("progress-bar").style.width = percent + "%";
+                };
+
+                xhr.onload = () => {
+                    let res = JSON.parse(xhr.responseText);
+                    showToast("Code: " + res.code);
+                };
+
+                xhr.send(formData);
+            }
+
+            // Download
+            function downloadFile(){
+                let code = document.getElementById("code").value;
                 if(code){
                     window.location = "/get/" + code;
                 } else {
-                    alert("Enter code");
+                    showToast("Enter code");
                 }
+            }
+
+            function showToast(msg){
+                let t = document.getElementById("toast");
+                t.innerText = msg;
+                t.style.display = "block";
+                setTimeout(()=>{t.style.display="none"},3000);
             }
         </script>
 
@@ -161,24 +236,20 @@ def home():
 # 📤 UPLOAD
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), expiry: int = Form(30)):
-    try:
-        code = generate_code()
-        filepath = os.path.join(UPLOAD_DIR, file.filename)
+    code = generate_code()
+    filepath = os.path.join(UPLOAD_DIR, file.filename)
 
-        with open(filepath, "wb") as f:
-            f.write(await file.read())
+    with open(filepath, "wb") as f:
+        f.write(await file.read())
 
-        collection.insert_one({
-            "code": code,
-            "filename": file.filename,
-            "filepath": filepath,
-            "expiry": get_expiry(expiry)
-        })
+    collection.insert_one({
+        "code": code,
+        "filename": file.filename,
+        "filepath": filepath,
+        "expiry": get_expiry(expiry)
+    })
 
-        return {"code": code}
-
-    except Exception as e:
-        return {"error": str(e)}
+    return {"code": code}
 
 
 # 📥 DOWNLOAD
@@ -190,15 +261,6 @@ def get_file(code: str):
         return {"error": "Invalid code"}
 
     if datetime.datetime.utcnow() > file_data["expiry"]:
-        return {"error": "File expired"}
+        return {"error": "Expired"}
 
-    filepath = file_data["filepath"]
-
-    if not os.path.exists(filepath):
-        return {"error": "File not found"}
-
-    return FileResponse(
-        path=filepath,
-        filename=file_data["filename"],
-        media_type="application/octet-stream"
-    )
+    return FileResponse(file_data["filepath"], filename=file_data["filename"])
