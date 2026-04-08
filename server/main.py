@@ -12,13 +12,16 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-# 🌐 PRO UI
+# 🌐 WEB UI
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
     <html>
     <head>
-        <title>PullBox</title>
+        <title>PullBox | File Sharing</title>
+
+        <meta name="description" content="PullBox - Fast and secure file sharing system">
+        <meta name="author" content="Abhijith">
 
         <style>
             body {
@@ -26,11 +29,11 @@ def home():
                 text-align: center;
                 background: linear-gradient(-45deg, #0f172a, #1e293b, #0ea5e9, #020617);
                 background-size: 400% 400%;
-                animation: gradientBG 10s ease infinite;
+                animation: bg 10s ease infinite;
                 color: white;
             }
 
-            @keyframes gradientBG {
+            @keyframes bg {
                 0% {background-position: 0% 50%;}
                 50% {background-position: 100% 50%;}
                 100% {background-position: 0% 50%;}
@@ -43,12 +46,11 @@ def home():
 
             .box {
                 background: rgba(255,255,255,0.08);
-                backdrop-filter: blur(12px);
                 padding: 20px;
                 margin: 20px auto;
                 width: 350px;
                 border-radius: 15px;
-                box-shadow: 0 0 20px rgba(0,0,0,0.4);
+                backdrop-filter: blur(10px);
             }
 
             input, button {
@@ -57,6 +59,11 @@ def home():
                 width: 80%;
                 border-radius: 8px;
                 border: none;
+            }
+
+            input {
+                background: #0f172a;
+                color: white;
             }
 
             button {
@@ -115,7 +122,7 @@ def home():
     <body>
 
         <h1>🚀 PullBox</h1>
-        <p>Pro File Sharing System</p>
+        <p>Fast & Secure File Sharing</p>
 
         <!-- Upload -->
         <div class="box">
@@ -142,13 +149,13 @@ def home():
         <div id="toast" class="toast"></div>
 
         <script>
-            let selectedFile;
+            let selectedFile = null;
 
             const fileInput = document.getElementById("fileInput");
             const preview = document.getElementById("preview");
             const dropZone = document.getElementById("drop-zone");
 
-            // Drag Drop
+            // Drag & Drop
             dropZone.addEventListener("dragover", e => {
                 e.preventDefault();
                 dropZone.style.background = "#1e293b";
@@ -175,14 +182,14 @@ def home():
                     reader.onload = e => {
                         preview.src = e.target.result;
                         preview.style.display = "block";
-                    }
+                    };
                     reader.readAsDataURL(file);
                 } else {
                     preview.style.display = "none";
                 }
             }
 
-            // Upload with progress
+            // Upload
             function uploadFile(){
                 if(!selectedFile){
                     showToast("Select file first");
@@ -203,8 +210,16 @@ def home():
                 };
 
                 xhr.onload = () => {
-                    let res = JSON.parse(xhr.responseText);
-                    showToast("Code: " + res.code);
+                    try {
+                        let res = JSON.parse(xhr.responseText);
+                        if(res.code){
+                            showToast("Code: " + res.code);
+                        } else {
+                            showToast("Upload failed");
+                        }
+                    } catch {
+                        showToast("Error uploading");
+                    }
                 };
 
                 xhr.send(formData);
@@ -212,7 +227,7 @@ def home():
 
             // Download
             function downloadFile(){
-                let code = document.getElementById("code").value;
+                let code = document.getElementById("code").value.trim();
                 if(code){
                     window.location = "/get/" + code;
                 } else {
@@ -233,26 +248,30 @@ def home():
     """
 
 
-# 📤 UPLOAD
+# 📤 UPLOAD API
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), expiry: int = Form(30)):
-    code = generate_code()
-    filepath = os.path.join(UPLOAD_DIR, file.filename)
+    try:
+        code = generate_code()
+        filepath = os.path.join(UPLOAD_DIR, file.filename)
 
-    with open(filepath, "wb") as f:
-        f.write(await file.read())
+        with open(filepath, "wb") as f:
+            f.write(await file.read())
 
-    collection.insert_one({
-        "code": code,
-        "filename": file.filename,
-        "filepath": filepath,
-        "expiry": get_expiry(expiry)
-    })
+        collection.insert_one({
+            "code": code,
+            "filename": file.filename,
+            "filepath": filepath,
+            "expiry": get_expiry(expiry)
+        })
 
-    return {"code": code}
+        return {"code": code}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
-# 📥 DOWNLOAD
+# 📥 DOWNLOAD API
 @app.get("/get/{code}")
 def get_file(code: str):
     file_data = collection.find_one({"code": code})
@@ -261,6 +280,11 @@ def get_file(code: str):
         return {"error": "Invalid code"}
 
     if datetime.datetime.utcnow() > file_data["expiry"]:
-        return {"error": "Expired"}
+        return {"error": "File expired"}
 
-    return FileResponse(file_data["filepath"], filename=file_data["filename"])
+    filepath = file_data["filepath"]
+
+    if not os.path.exists(filepath):
+        return {"error": "File not found"}
+
+    return FileResponse(filepath, filename=file_data["filename"])
