@@ -11,7 +11,6 @@ app = FastAPI()
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
 # 🌐 WEB UI
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -23,6 +22,7 @@ def home():
         <!-- ✅ GOOGLE VERIFICATION -->
         <meta name="google-site-verification" content="Gn0PnOAEFIm7vpYoYM7vqtVsNpcAGrHJo0fKrUh9ahU" />
 
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="PullBox - Fast and secure file sharing system">
         <meta name="author" content="Abhijith">
 
@@ -34,6 +34,8 @@ def home():
                 background-size: 400% 400%;
                 animation: bg 10s ease infinite;
                 color: white;
+                margin: 0;
+                padding: 10px;
             }
 
             @keyframes bg {
@@ -42,16 +44,14 @@ def home():
                 100% {background-position: 0% 50%;}
             }
 
-            h1 {
-                margin-top: 30px;
-                color: #38bdf8;
-            }
+            h1 {margin-top: 30px; color: #38bdf8;}
 
             .box {
                 background: rgba(255,255,255,0.08);
                 padding: 20px;
                 margin: 20px auto;
-                width: 350px;
+                width: 90%;
+                max-width: 350px;
                 border-radius: 15px;
                 backdrop-filter: blur(10px);
             }
@@ -59,26 +59,18 @@ def home():
             input, button {
                 margin: 10px;
                 padding: 10px;
-                width: 80%;
+                width: 90%;
                 border-radius: 8px;
                 border: none;
             }
 
-            input {
-                background: #0f172a;
-                color: white;
-            }
-
+            input {background: #0f172a; color: white;}
             button {
                 background: #38bdf8;
                 cursor: pointer;
                 transition: 0.3s;
             }
-
-            button:hover {
-                transform: scale(1.05);
-                background: #0ea5e9;
-            }
+            button:hover {transform: scale(1.05); background: #0ea5e9;}
 
             #drop-zone {
                 border: 2px dashed #38bdf8;
@@ -87,14 +79,9 @@ def home():
                 border-radius: 10px;
             }
 
-            #preview {
-                max-width: 100%;
-                display: none;
-                border-radius: 10px;
-            }
-
+            #preview {max-width: 100%; display: none; border-radius: 10px;}
             #progress {
-                width: 80%;
+                width: 90%;
                 height: 10px;
                 background: #1e293b;
                 margin: auto;
@@ -102,12 +89,7 @@ def home():
                 overflow: hidden;
                 display: none;
             }
-
-            #progress-bar {
-                height: 100%;
-                width: 0%;
-                background: #38bdf8;
-            }
+            #progress-bar {height: 100%; width: 0%; background: #38bdf8;}
 
             .toast {
                 position: fixed;
@@ -123,21 +105,16 @@ def home():
     </head>
 
     <body>
-
         <h1>🚀 PullBox</h1>
         <p>Fast & Secure File Sharing</p>
 
         <!-- Upload -->
         <div class="box">
             <h3>Upload</h3>
-
             <div id="drop-zone">Drag & Drop File Here</div>
             <input type="file" id="fileInput"><br>
-
             <img id="preview">
-
             <div id="progress"><div id="progress-bar"></div></div>
-
             <button onclick="uploadFile()">Upload</button>
         </div>
 
@@ -153,51 +130,30 @@ def home():
 
         <script>
             let selectedFile = null;
-
             const fileInput = document.getElementById("fileInput");
             const preview = document.getElementById("preview");
             const dropZone = document.getElementById("drop-zone");
 
             // Drag & Drop
-            dropZone.addEventListener("dragover", e => {
-                e.preventDefault();
-                dropZone.style.background = "#1e293b";
-            });
-
-            dropZone.addEventListener("dragleave", () => {
-                dropZone.style.background = "transparent";
-            });
-
+            dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.style.background = "#1e293b"; });
+            dropZone.addEventListener("dragleave", () => { dropZone.style.background = "transparent"; });
             dropZone.addEventListener("drop", e => {
                 e.preventDefault();
                 selectedFile = e.dataTransfer.files[0];
                 handlePreview(selectedFile);
             });
-
-            fileInput.addEventListener("change", () => {
-                selectedFile = fileInput.files[0];
-                handlePreview(selectedFile);
-            });
+            fileInput.addEventListener("change", () => { selectedFile = fileInput.files[0]; handlePreview(selectedFile); });
 
             function handlePreview(file){
                 if(file && file.type.startsWith("image")){
                     const reader = new FileReader();
-                    reader.onload = e => {
-                        preview.src = e.target.result;
-                        preview.style.display = "block";
-                    };
+                    reader.onload = e => { preview.src = e.target.result; preview.style.display = "block"; };
                     reader.readAsDataURL(file);
-                } else {
-                    preview.style.display = "none";
-                }
+                } else { preview.style.display = "none"; }
             }
 
-            // Upload
             function uploadFile(){
-                if(!selectedFile){
-                    showToast("Select file first");
-                    return;
-                }
+                if(!selectedFile){ showToast("Select file first"); return; }
 
                 let formData = new FormData();
                 formData.append("file", selectedFile);
@@ -213,29 +169,27 @@ def home():
                 };
 
                 xhr.onload = () => {
-                    try {
-                        let res = JSON.parse(xhr.responseText);
-                        if(res.code){
-                            showToast("Code: " + res.code);
-                        } else {
-                            showToast("Upload failed");
+                    document.getElementById("progress").style.display = "none";
+                    if(xhr.status === 200){
+                        try {
+                            let res = JSON.parse(xhr.responseText);
+                            if(res.code){ showToast("✅ Code: " + res.code); }
+                            else if(res.error){ showToast("❌ " + res.error); }
+                            else{ showToast("⚠ Unexpected response"); }
+                        } catch {
+                            showToast("❌ Error parsing response");
                         }
-                    } catch {
-                        showToast("Error uploading");
-                    }
+                    } else { showToast("❌ Upload failed (server error)"); }
                 };
 
+                xhr.onerror = () => { showToast("❌ Network error"); };
                 xhr.send(formData);
             }
 
-            // Download
             function downloadFile(){
                 let code = document.getElementById("code").value.trim();
-                if(code){
-                    window.location = "/get/" + code;
-                } else {
-                    showToast("Enter code");
-                }
+                if(code){ window.location = "/get/" + code; }
+                else{ showToast("Enter code"); }
             }
 
             function showToast(msg){
@@ -245,11 +199,9 @@ def home():
                 setTimeout(()=>{t.style.display="none"},3000);
             }
         </script>
-
     </body>
     </html>
     """
-
 
 # 📤 UPLOAD API
 @app.post("/upload")
@@ -269,25 +221,14 @@ async def upload_file(file: UploadFile = File(...), expiry: int = Form(30)):
         })
 
         return {"code": code}
-
     except Exception as e:
         return {"error": str(e)}
-
 
 # 📥 DOWNLOAD API
 @app.get("/get/{code}")
 def get_file(code: str):
     file_data = collection.find_one({"code": code})
-
-    if not file_data:
-        return {"error": "Invalid code"}
-
-    if datetime.datetime.utcnow() > file_data["expiry"]:
-        return {"error": "File expired"}
-
-    filepath = file_data["filepath"]
-
-    if not os.path.exists(filepath):
-        return {"error": "File not found"}
-
-    return FileResponse(filepath, filename=file_data["filename"])
+    if not file_data: return {"error": "Invalid code"}
+    if datetime.datetime.utcnow() > file_data["expiry"]: return {"error": "File expired"}
+    if not os.path.exists(file_data["filepath"]): return {"error": "File not found"}
+    return FileResponse(file_data["filepath"], filename=file_data["filename"])
