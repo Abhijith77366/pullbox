@@ -1,31 +1,42 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import FileResponse
 import os
-from database import collection
-from utils import generate_code, get_expiry
 import datetime
+
+from server.database import collection
+from server.utils import generate_code, get_expiry
 
 app = FastAPI()
 
-UPLOAD_DIR = "../uploads"
+# Upload folder (safe for Render)
+UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), expiry: int = Form(30)):
-    code = generate_code()
-    filepath = os.path.join(UPLOAD_DIR, file.filename)
+    try:
+        code = generate_code()
 
-    with open(filepath, "wb") as f:
-        f.write(await file.read())
+        filepath = os.path.join(UPLOAD_DIR, file.filename)
 
-    collection.insert_one({
-        "code": code,
-        "filename": file.filename,
-        "filepath": filepath,
-        "expiry": get_expiry(expiry)
-    })
+        # Save file
+        with open(filepath, "wb") as f:
+            f.write(await file.read())
 
-    return {"code": code}
+        # Store in DB
+        collection.insert_one({
+            "code": code,
+            "filename": file.filename,
+            "filepath": filepath,
+            "expiry": get_expiry(expiry)
+        })
+
+        return {"code": code}
+
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.get("/get/{code}")
 def get_file(code: str):
@@ -34,7 +45,18 @@ def get_file(code: str):
     if not file_data:
         return {"error": "Invalid code"}
 
+    # Expiry check
     if datetime.datetime.utcnow() > file_data["expiry"]:
-        return {"error": "Expired"}
+        return {"error": "File expired"}
 
-    return FileResponse(file_data["filepath"], filename=file_data["filename"])
+    filepath = file_data["filepath"]
+
+    # Check file exists
+    if not os.path.exists(filepath):
+        return {"error": "File not found on server"}
+
+    return FileResponse(
+        path=filepath,
+        filename=file_data["filename"],
+        media_type="application/octet-stream"
+    )
