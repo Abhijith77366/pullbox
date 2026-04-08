@@ -20,6 +20,9 @@ def home():
     <head>
         <title>PullBox | File Sharing</title>
 
+        <!-- ✅ GOOGLE VERIFICATION -->
+        <meta name="google-site-verification" content="Gn0PnOAEFIm7vpYoYM7vqtVsNpcAGrHJo0fKrUh9ahU" />
+
         <meta name="description" content="PullBox - Fast and secure file sharing system">
         <meta name="author" content="Abhijith">
 
